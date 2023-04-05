@@ -1,48 +1,19 @@
 import { Readable } from 'stream';
-import { Result, Ok, Err } from 'ts-results';
+import { Result, Ok } from 'ts-results';
 import invariant from 'ts-invariant';
 import {
   Collection,
-  CollectionDefinition,
   Item,
-  ItemGroupDefinition,
+  ItemGroup,
   Request,
-  RequestBody,
   Response,
   VariableScope,
 } from 'postman-collection';
 
-// Fix incorrect type definition
-export type ExtendedRequest = Request & {
-  body?: RequestBody & {
-    options?: {
-      raw?: {
-        language?: string;
-      };
-    };
-  };
-};
-
-// Fix incorrect type definition
-export type ExtendedResponse = Response & {
-  contentInfo(): {
-    contentType: string;
-    mimeType: string;
-    mimeFormat: string;
-    charset: string;
-    extension: string;
-  };
-};
-
-// Fix incorrect type definition
-export type ExtendedVariableScope = VariableScope & {
-  replaceIn(template: string): string;
-};
-
 export type PostmanEntry = {
-  request: ExtendedRequest;
-  response?: ExtendedResponse;
-  variableScope: ExtendedVariableScope;
+  request: Request;
+  response?: Response;
+  variableScope: VariableScope;
 };
 
 export interface PostmanCollectionEntries extends AsyncIterable<PostmanEntry> {}
@@ -68,9 +39,7 @@ export class PostmanCollectionEntries {
     }
 
     // Ensure input can be parsed as JSON.
-    let collectionDefinition:
-      | (CollectionDefinition & ItemGroupDefinition)
-      | null = null;
+    let collectionDefinition: Collection.definition | null = null;
     try {
       collectionDefinition = JSON.parse(collectionSource);
     } catch (err) {
@@ -83,33 +52,32 @@ export class PostmanCollectionEntries {
       }
     }
 
-    // Only iterate if this collection is non-empty.
+    // Only continue if this collection is non-empty.
     if (!collectionDefinition?.item) {
       return;
     }
 
-    const collection = new Collection(collectionDefinition);
-    const variableScope = new VariableScope(
-      collection.variables
-    ) as ExtendedVariableScope;
+    const collection: Collection & ItemGroup = new Collection(
+      collectionDefinition
+    );
+    const variableScope = new VariableScope(collection.variables);
 
     // Recursively iterate through folders.
     const items: Item[] = [];
     collection.forEachItem((item) => items.push(item));
 
-    // Yield valid PostmanEntry items.
     for (const item of items) {
       yield Ok({
-        request: item.request as ExtendedRequest,
+        request: item.request,
         variableScope,
       });
 
-      for (const res of item.responses.all()) {
-        const request = (res.originalRequest ||
-          item.request) as ExtendedRequest;
-        const response = res as ExtendedResponse;
-
-        yield Ok({ request, response, variableScope });
+      for (const response of item.responses.all()) {
+        yield Ok({
+          request: response.originalRequest || item.request,
+          response,
+          variableScope,
+        });
       }
     }
   }

@@ -20,7 +20,8 @@
     "noImplicitAny": false,
     "downlevelIteration": true,
     "isolatedModules": true,
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "typeRoots": ["./node_modules/@types", "./types"]
   },
   "include": ["src"],
   "exclude": ["**/*.test.ts", "**/*.test.tsx", "./build/**/*", "examples/**"]
